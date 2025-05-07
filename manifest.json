@@ -1,0 +1,12 @@
+﻿{
+	"name": "PalmPatcher",
+	"authorName": "Gorakh",
+	"version_number": "1.0.0",
+	"website_url": "https://github.com/Goorakh/RoR2_PalmPatcher",
+	"description": "Fixes Seeker's Palm Blast damage not scaling past base damage. Serverside and vanilla compatible.",
+	"dependencies": [
+		"bbepis-BepInExPack-5.4.2117",
+		"RiskofThunder-HookGenPatcher-1.2.5",
+		"RiskofThunder-R2API_Core-5.1.5"
+	]
+}
