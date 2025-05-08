@@ -72,7 +72,6 @@ namespace PalmPatcher
                 if (self.isAuthority)
                 {
                     GameObject palmProjectilePrefab = self.charge < 1f ? self.projectilePrefab : self.chargedProjectilePrefab;
-                    PalmBlastProjectileController palmProjectile = palmProjectilePrefab ? palmProjectilePrefab.GetComponent<PalmBlastProjectileController>() : null;
 
                     Ray aimRay = self.GetAimRay();
                     TrajectoryAimAssist.ApplyTrajectoryAimAssist(ref aimRay, palmProjectilePrefab, self.gameObject);
