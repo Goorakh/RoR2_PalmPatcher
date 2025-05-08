@@ -1,6 +1,14 @@
 using BepInEx;
+using EntityStates.Seeker;
+using Mono.Cecil.Cil;
+using MonoMod.Cil;
+using PalmPatcher.Utilities.Extensions;
 using RoR2;
+using RoR2.Projectile;
 using System.Diagnostics;
+using UnityEngine;
+using UnityEngine.AddressableAssets;
+using UnityEngine.Networking;
 
 namespace PalmPatcher
 {
@@ -23,7 +31,18 @@ namespace PalmPatcher
 
             Log.Init(Logger);
 
-            On.PalmBlastProjectileController.Init += PalmBlastProjectileController_Init;
+            IL.EntityStates.Seeker.BaseFirePalmBlast.FireProjectile += BaseFirePalmBlast_FireProjectile;
+
+            static void addPalmInitializer(GameObject palmPrefab)
+            {
+                if (!palmPrefab.GetComponent<PalmBlastProjectileInitializer>())
+                {
+                    palmPrefab.AddComponent<PalmBlastProjectileInitializer>();
+                }
+            }
+
+            Addressables.LoadAssetAsync<GameObject>("RoR2/DLC2/Seeker/PalmBlastProjectile.prefab").CallOnSuccess(addPalmInitializer);
+            Addressables.LoadAssetAsync<GameObject>("RoR2/DLC2/Seeker/PalmBlastChargedProjectile.prefab").CallOnSuccess(addPalmInitializer);
 
             stopwatch.Stop();
             Log.Message_NoCallerPrefix($"Initialized in {stopwatch.Elapsed.TotalMilliseconds:F0}ms");
@@ -34,21 +53,46 @@ namespace PalmPatcher
             SingletonHelper.Unassign(ref _instance, this);
         }
 
-        static void PalmBlastProjectileController_Init(On.PalmBlastProjectileController.orig_Init orig, PalmBlastProjectileController self, CharacterBody body)
+        static void BaseFirePalmBlast_FireProjectile(ILContext il)
         {
-            orig(self, body);
+            ILCursor c = new ILCursor(il);
 
-            if (self && self.projectileDamage)
+            if (!c.TryGotoNext(MoveType.After,
+                               x => x.MatchCallOrCallvirt(typeof(NetworkServer), "get_" + nameof(NetworkServer.active))))
             {
-                CharacterBody owner = self.ownerBody;
-                if (!owner)
-                    owner = body;
+                Log.Error("Failed to find patch location");
+                return;
+            }
 
-                if (owner)
+            c.Emit(OpCodes.Ldarg_0);
+            c.EmitDelegate(actualFireProjectile);
+
+            static void actualFireProjectile(BaseFirePalmBlast self)
+            {
+                if (self.isAuthority)
                 {
-                    self.projectileDamage.damage = owner.damage;
+                    GameObject palmProjectilePrefab = self.charge < 1f ? self.projectilePrefab : self.chargedProjectilePrefab;
+                    PalmBlastProjectileController palmProjectile = palmProjectilePrefab ? palmProjectilePrefab.GetComponent<PalmBlastProjectileController>() : null;
+
+                    Ray aimRay = self.GetAimRay();
+                    TrajectoryAimAssist.ApplyTrajectoryAimAssist(ref aimRay, palmProjectilePrefab, self.gameObject);
+
+                    // Damage and speed are initialized by PalmBlastProjectileController.Init,
+                    // not ideal to still do it there, but this is the less intrusive solution
+                    ProjectileManager.instance.FireProjectile(new FireProjectileInfo
+                    {
+                        projectilePrefab = palmProjectilePrefab,
+                        owner = self.gameObject,
+                        position = aimRay.origin,
+                        rotation = Util.QuaternionSafeLookRotation(aimRay.direction),
+                        crit = self.RollCrit()
+                    });
                 }
             }
+
+            // Turn server active check into if (false) to skip original code
+            c.Emit(OpCodes.Pop);
+            c.Emit(OpCodes.Ldc_I4_0);
         }
     }
 }
