@@ -1,7 +1,7 @@
 ﻿{
 	"name": "PalmPatcher",
 	"authorName": "Gorakh",
-	"version_number": "1.0.0",
+	"version_number": "1.1.0",
 	"website_url": "https://github.com/Goorakh/RoR2_PalmPatcher",
 	"description": "Fixes Seeker's Palm Blast damage not scaling past base damage and not being able to crit.",
 	"dependencies": [
